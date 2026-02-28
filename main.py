@@ -1,6 +1,7 @@
 import logging 
 import os
 import json
+import pytz
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -13,6 +14,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 # ==================== KONFIGURASI ====================
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SHEET_NAME = "Penjualan"
+WIB = pytz.timezone("Asia/Jakarta")
 
 # ==================== MENU & HARGA ====================
 MENU = {
@@ -22,8 +24,8 @@ MENU = {
 }
 
 PEMBAYARAN = {
-    "qris": "QRIS 📱",
-    "cash": "Cash 💵",
+    "qris": "QRIS",
+    "cash": "CASH",
 }
 
 # ==================== STATE ====================
@@ -52,8 +54,8 @@ def get_sheet():
 
 def simpan_ke_sheet(data: dict):
     sheet = get_sheet()
-    no = sheet.get_all_values().__len__()
-    now = datetime.now()
+    no = len(sheet.get_all_values())
+    now = datetime.now(WIB)
     sheet.append_row([
         no,
         now.strftime("%d/%m/%Y"),
@@ -71,7 +73,7 @@ def get_rekap_hari_ini():
     rows = sheet.get_all_values()
     if len(rows) <= 1:
         return None
-    today = datetime.now().strftime("%d/%m/%Y")
+    today = datetime.now(WIB).strftime("%d/%m/%Y")
     rekap = {}
     total_omzet = 0
     for row in rows[1:]:
@@ -218,7 +220,7 @@ async def rekap_hari_ini(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     try:
         result = get_rekap_hari_ini()
-        today = datetime.now().strftime("%d/%m/%Y")
+        today = datetime.now(WIB).strftime("%d/%m/%Y")
         keyboard = [
             [InlineKeyboardButton("🛒 Catat Penjualan", callback_data="catat")],
             [InlineKeyboardButton("🔄 Refresh", callback_data="rekap")],
