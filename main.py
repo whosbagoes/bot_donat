@@ -16,9 +16,9 @@ SHEET_NAME = "Penjualan"
 
 # ==================== MENU & HARGA ====================
 MENU = {
-    "paket_teman_dekat": {"nama": "Paket Teman Dekat 🍩❤️", "harga": 40000},
-    "paket_teman_manis": {"nama": "Paket Teman Manis 🍩🌸", "harga": 20000},
-    "donat_pcs":         {"nama": "Donat PCS 🍩", "harga": 7000},
+    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000},
+    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000},
+    "donat_pcs":         {"nama": "Donat PCS", "harga": 7000},
 }
 
 PEMBAYARAN = {
