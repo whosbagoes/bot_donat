@@ -1,7 +1,6 @@
 import logging 
 import os
 import json
-import pytz
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,18 +13,17 @@ from oauth2client.service_account import ServiceAccountCredentials
 # ==================== KONFIGURASI ====================
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SHEET_NAME = "Penjualan"
-WIB = pytz.timezone("Asia/Jakarta")
 
 # ==================== MENU & HARGA ====================
 MENU = {
-    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000},
-    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000},
-    "donat_pcs":         {"nama": "Donat PCS", "harga": 7000},
+    "paket_teman_dekat": {"nama": "Paket Teman Dekat 🍩❤️", "harga": 40000},
+    "paket_teman_manis": {"nama": "Paket Teman Manis 🍩🌸", "harga": 20000},
+    "donat_pcs":         {"nama": "Donat PCS 🍩", "harga": 7000},
 }
 
 PEMBAYARAN = {
-    "qris": "QRIS",
-    "cash": "CASH",
+    "qris": "QRIS 📱",
+    "cash": "Cash 💵",
 }
 
 # ==================== STATE ====================
@@ -50,12 +48,13 @@ def get_sheet():
     except gspread.WorksheetNotFound:
         sheet = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=10)
         sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar", "User Telegram"])
+        sheet.getRange(1, 1, 1, 9).setBackground("#4A90D9")
     return sheet
 
 def simpan_ke_sheet(data: dict):
     sheet = get_sheet()
-    no = len(sheet.get_all_values())
-    now = datetime.now(WIB)
+    no = sheet.get_all_values().__len__()
+    now = datetime.now()
     sheet.append_row([
         no,
         now.strftime("%d/%m/%Y"),
@@ -73,7 +72,7 @@ def get_rekap_hari_ini():
     rows = sheet.get_all_values()
     if len(rows) <= 1:
         return None
-    today = datetime.now(WIB).strftime("%d/%m/%Y")
+    today = datetime.now().strftime("%d/%m/%Y")
     rekap = {}
     total_omzet = 0
     for row in rows[1:]:
@@ -220,7 +219,7 @@ async def rekap_hari_ini(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     try:
         result = get_rekap_hari_ini()
-        today = datetime.now(WIB).strftime("%d/%m/%Y")
+        today = datetime.now().strftime("%d/%m/%Y")
         keyboard = [
             [InlineKeyboardButton("🛒 Catat Penjualan", callback_data="catat")],
             [InlineKeyboardButton("🔄 Refresh", callback_data="rekap")],
