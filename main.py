@@ -48,7 +48,6 @@ def get_sheet():
     except gspread.WorksheetNotFound:
         sheet = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=10)
         sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar", "User Telegram"])
-        sheet.getRange(1, 1, 1, 9).setBackground("#4A90D9")
     return sheet
 
 def simpan_ke_sheet(data: dict):
