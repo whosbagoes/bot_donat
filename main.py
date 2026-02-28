@@ -1,4 +1,4 @@
-import logging  
+import logging 
 import os
 import json
 import pytz
@@ -24,8 +24,8 @@ MENU = {
 }
 
 PEMBAYARAN = {
-    "qris": "QRIS",
-    "cash": "Cash",
+    "qris": "QRIS 📱",
+    "cash": "Cash 💵",
 }
 
 # ==================== STATE ====================
@@ -52,10 +52,21 @@ def get_sheet():
         sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar", "User Telegram"])
     return sheet
 
+def parse_angka(nilai):
+    """Konversi nilai dari sheet ke int, handles format Rp40,000 atau 40000"""
+    if not nilai:
+        return 0
+    nilai = str(nilai).replace("Rp", "").replace(",", "").replace(".", "").strip()
+    try:
+        return int(float(nilai))
+    except:
+        return 0
+
 def simpan_ke_sheet(data: dict):
     sheet = get_sheet()
     no = len(sheet.get_all_values())
     now = datetime.now(WIB)
+    logger.info(f"Waktu WIB: {now}")
     sheet.append_row([
         no,
         now.strftime("%d/%m/%Y"),
@@ -79,8 +90,8 @@ def get_rekap_hari_ini():
     for row in rows[1:]:
         if len(row) >= 8 and row[1] == today:
             produk = row[3]
-            jumlah = int(row[4]) if row[4] else 0
-            total = int(row[6]) if row[6] else 0
+            jumlah = parse_angka(row[4])
+            total = parse_angka(row[6])
             if produk not in rekap:
                 rekap[produk] = {"jumlah": 0, "total": 0}
             rekap[produk]["jumlah"] += jumlah
@@ -107,6 +118,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu_utama_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data.clear()
     keyboard = [
         [InlineKeyboardButton("🛒 Catat Penjualan", callback_data="catat")],
         [InlineKeyboardButton("📊 Rekap Hari Ini", callback_data="rekap")],
@@ -120,10 +132,11 @@ async def menu_utama_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def catat_penjualan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    context.user_data.clear()
     keyboard = [
-        [InlineKeyboardButton("Paket Teman Dekat\nRp 40.000", callback_data="paket_teman_dekat")],
-        [InlineKeyboardButton("Paket Teman Manis\nRp 20.000", callback_data="paket_teman_manis")],
-        [InlineKeyboardButton("Donat PCS\nRp 7.000", callback_data="donat_pcs")],
+        [InlineKeyboardButton("Paket Teman Dekat 🍩❤️\nRp 40.000", callback_data="paket_teman_dekat")],
+        [InlineKeyboardButton("Paket Teman Manis 🍩🌸\nRp 20.000", callback_data="paket_teman_manis")],
+        [InlineKeyboardButton("Donat PCS 🍩\nRp 7.000", callback_data="donat_pcs")],
         [InlineKeyboardButton("❌ Batal", callback_data="batal")],
     ]
     await query.edit_message_text(
@@ -211,7 +224,11 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"Error simpan: {e}")
-        await query.edit_message_text(f"❌ Gagal menyimpan: {str(e)}")
+        keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
+        await query.edit_message_text(
+            f"❌ Gagal menyimpan: {str(e)}\n\nTekan Menu Utama untuk coba lagi.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -241,7 +258,11 @@ async def rekap_hari_ini(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(teks, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Error rekap: {e}")
-        await query.edit_message_text(f"❌ Gagal mengambil rekap: {str(e)}")
+        keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
+        await query.edit_message_text(
+            f"❌ Gagal mengambil rekap: {str(e)}\n\nTekan Menu Utama untuk coba lagi.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     return ConversationHandler.END
 
 async def batal(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -264,7 +285,11 @@ def main():
             PILIH_BAYAR: [CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$")],
             KONFIRMASI: [CallbackQueryHandler(simpan_data, pattern="^simpan$")],
         },
-        fallbacks=[CallbackQueryHandler(batal, pattern="^batal$")],
+        fallbacks=[
+            CallbackQueryHandler(batal, pattern="^batal$"),
+            CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$"),
+            CommandHandler("start", start),
+        ],
         per_message=False,
     )
 
