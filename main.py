@@ -1,4 +1,4 @@
-import logging 
+import logging  
 import os
 import json
 import pytz
@@ -24,8 +24,8 @@ MENU = {
 }
 
 PEMBAYARAN = {
-    "qris": "QRIS 📱",
-    "cash": "Cash 💵",
+    "qris": "QRIS",
+    "cash": "Cash",
 }
 
 # ==================== STATE ====================
@@ -121,9 +121,9 @@ async def catat_penjualan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     keyboard = [
-        [InlineKeyboardButton("Paket Teman Dekat 🍩❤️\nRp 40.000", callback_data="paket_teman_dekat")],
-        [InlineKeyboardButton("Paket Teman Manis 🍩🌸\nRp 20.000", callback_data="paket_teman_manis")],
-        [InlineKeyboardButton("Donat PCS 🍩\nRp 7.000", callback_data="donat_pcs")],
+        [InlineKeyboardButton("Paket Teman Dekat\nRp 40.000", callback_data="paket_teman_dekat")],
+        [InlineKeyboardButton("Paket Teman Manis\nRp 20.000", callback_data="paket_teman_manis")],
+        [InlineKeyboardButton("Donat PCS\nRp 7.000", callback_data="donat_pcs")],
         [InlineKeyboardButton("❌ Batal", callback_data="batal")],
     ]
     await query.edit_message_text(
