@@ -11,14 +11,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # ==================== KONFIGURASI ====================
-BOT_TOKEN = os.environ.get("8696717037:AAEr5wrj0VGCUbEJ8RwHJ89E53t8LpZacy0")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SHEET_NAME = "Penjualan"
 
 # ==================== MENU & HARGA ====================
 MENU = {
-    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000},
-    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000},
-    "donat_pcs":         {"nama": "Donat PCS", "harga": 7000},
+    "paket_teman_dekat": {"nama": "Paket Teman Dekat 🍩❤️", "harga": 40000},
+    "paket_teman_manis": {"nama": "Paket Teman Manis 🍩🌸", "harga": 20000},
+    "donat_pcs":         {"nama": "Donat PCS 🍩", "harga": 7000},
 }
 
 PEMBAYARAN = {
@@ -38,21 +38,8 @@ def get_sheet():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_json = json.loads(os.environ.get("{
-  "type": "service_account",
-  "project_id": "gen-lang-client-0097453059",
-  "private_key_id": "cf1b9ac599db3861c37c165894868d694152d761",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDCYaLj81hsY6wV\nXNVSfvIRKd4cGbpM/A8zMseDce0NBOKA4nCea6xopSE/TRDji0XwwBAiisT4YU8X\nFg87QdYW96eIFEre7RoNiOAFWdQKyFqRxHlsU3AB6EgtPbfNz2fwQKjwTqVrvLIF\noVUj+uU9UlQGi2DA96Rkxx382Ouu/VHNc65pZWhXbMyeDlcz4ke4nTGmwp/kqqMo\nJPP+3eIw7HOtqbhhnjGE1gM/5xgKhX6E3oHsWL+hLFP2jRIsYrSwBFZjs1W/f8US\nnN/LOzv9kgppSIPvp9Ry0zRf/27bKRAZk6UekzGgXKDAoIjYh45EPBjVsrYM4Q7X\n1oZVKgSTAgMBAAECggEAV5FMpIx4BTxRxb3wjB2MR5co7FfayduzrUjvAJROSlMt\nBwr72SKApRPfCnlZZmjTtUWQ/z6sxYhw7OGPMw7Rt78Rxgf+QrdlyTskUMTK9aCU\nzJ5KZTahevp9qYPoTdtl46H9eWS0uPhk6oxnorHgm+N+3wPjLothj9Tz+XhvlIDY\nq7x5zyDDjw9+wKGvJqP40bDbSvrOJmlmvMgs3xFyKGJ7cqOXIFzbx6vTtD2SAvmY\np4s+R8D58dyeM/eCsEtw5g+NZbe0qBfH4vtUPxWSSpCNCsloajSID+WWh1h+fgKs\nUz79gV13o0MSt0eBUAajT5vteBZeBbDpfJ/DfUaeoQKBgQDyjDfzkgI0QT7GEBHF\nMiBLn6wAviIUBAX8+Q0rL8iTExrQZ858WaOdk5jKrLTZKANLF6enTJI4QqEnxbyh\nxmgJlpnmLE27khBE2hx38Tj5pNTLptZ1ptb3pKW9+u3o4vFmWCwdgvmwGaH0dLsG\nEjogVzzxSJeWjVwbO3miFWrSnQKBgQDNKYjRdWJHRKoBARArIeHl/VHGxzVmGLIh\nkcb96ohYFWt+8wpI7xN6weY9ZTq5PnVWIpNxipcZ/LaqVH0j/fHHbDyFmu3sT2MV\nlEgESeHsDXN5+GRc2KQIFjxj3ZpD10IDZWUGpqNQD6MAaylzctHA1bsGxmed62UM\nvjzpi+207wKBgG3XADOmyKa/cV0iw9loxOVabvt7H1WvKMMSSltnbU7llPwSNplr\nwsPGpqgKJHA/RZaJJNyHuaQO0IqBatZcUpsc/58UKzOphwKXP9M1g5bShaega3im\nUK2fe4uYiosv0yCFB51pxgdw5D4fat7p/DbPKwMd28BLTg3rFj9HsbOlAoGBAMlG\nMTMEzTkL9RjtGRans/41ao/wCcQzADcM1ENxXvfDc+VkvLdWzS6GocGj2Vu5GdY6\nL5qZk6nsEqzCHM89qIC0ACA3IanPLG8UPR7v+NPjUmHbvWKVKz+/yNlUo65gtSOt\nytIek2PNI2Yau9zGTV+4jzaTWT5FnKpGzG13WOpDAoGABZHAJtfn/aUFOuRok1AF\neC3TuCyohshQRQxeUFW/Ag/COUNn2TIupQkTPHF1/dsS5Qfu7od/o5AjIqNfWv4c\nNRBGGboyqMlSmK/Hn9s8Nx5weC6Tz3zIZBlooU32KX7XrNpSWQlnx6iJsf20AnLG\naIrXA9/mO0rfueFv1gnGCps=\n-----END PRIVATE KEY-----\n",
-  "client_email": "penjualan-bot@gen-lang-client-0097453059.iam.gserviceaccount.com",
-  "client_id": "104364462427945367047",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/penjualan-bot%40gen-lang-client-0097453059.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
-"))
-    spreadsheet_id = os.environ.get("1OKqxHaP5-3_aTGzOMRlPwMiaRqmdffdT1HvHSMzjugk")
+    creds_json = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
+    spreadsheet_id = os.environ.get("SPREADSHEET_ID")
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, scope)
     client = gspread.authorize(creds)
     spreadsheet = client.open_by_key(spreadsheet_id)
