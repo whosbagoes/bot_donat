@@ -1,1 +1,1 @@
-worker: python bot_donat.py
+worker: python main.py
