@@ -18,9 +18,9 @@ WIB = pytz.timezone("Asia/Jakarta")
 
 # ==================== MENU & HARGA ====================
 MENU = {
-    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000},
-    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000},
-    "donat_pcs":         {"nama": "Donat PCS", "harga": 7000},
+    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000, "emoji": "🍩❤️"},
+    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
+    "donat_pcs":         {"nama": "Donat PCS", "harga": 7000,  "emoji": "🍩"},
 }
 
 PEMBAYARAN = {
@@ -29,7 +29,7 @@ PEMBAYARAN = {
 }
 
 # ==================== STATE ====================
-PILIH_MENU, PILIH_JUMLAH, PILIH_BAYAR, KONFIRMASI = range(4)
+PILIH_PRODUK, PILIH_BAYAR, KONFIRMASI = range(3)
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,12 +48,11 @@ def get_sheet():
     try:
         sheet = spreadsheet.worksheet(SHEET_NAME)
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=10)
+        sheet = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=9)
         sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar", "User Telegram"])
     return sheet
 
 def parse_angka(nilai):
-    """Konversi nilai dari sheet ke int, handles format Rp40,000 atau 40000"""
     if not nilai:
         return 0
     nilai = str(nilai).replace("Rp", "").replace(",", "").replace(".", "").strip()
@@ -62,22 +61,23 @@ def parse_angka(nilai):
     except:
         return 0
 
-def simpan_ke_sheet(data: dict):
+def simpan_ke_sheet(items: list, pembayaran: str, username: str):
     sheet = get_sheet()
     no = len(sheet.get_all_values())
     now = datetime.now(WIB)
-    logger.info(f"Waktu WIB: {now}")
-    sheet.append_row([
-        no,
-        now.strftime("%d/%m/%Y"),
-        now.strftime("%H:%M:%S"),
-        data["produk"],
-        data["jumlah"],
-        data["harga_satuan"],
-        data["total"],
-        data["pembayaran"],
-        data["username"],
-    ])
+    for item in items:
+        sheet.append_row([
+            no,
+            now.strftime("%d/%m/%Y"),
+            now.strftime("%H:%M:%S"),
+            item["nama"],
+            item["jumlah"],
+            item["harga_satuan"],
+            item["total"],
+            pembayaran,
+            username,
+        ])
+        no += 1
 
 def get_rekap_hari_ini():
     sheet = get_sheet()
@@ -99,9 +99,58 @@ def get_rekap_hari_ini():
             total_omzet += total
     return rekap, total_omzet
 
-# ==================== HELPER ====================
 def fmt(angka):
-    return f"{angka:,}".replace(",", ".")
+    return f"{int(angka):,}".replace(",", ".")
+
+# ==================== KEYBOARD HELPER ====================
+def build_menu_keyboard(selected: dict):
+    """Buat keyboard produk dengan tanda ✅ jika sudah dipilih dan ada jumlahnya"""
+    keyboard = []
+    for key, produk in MENU.items():
+        jumlah = selected.get(key, 0)
+        if jumlah > 0:
+            label = f"✅ {produk['emoji']} {produk['nama']} x{jumlah} — Rp {fmt(produk['harga'] * jumlah)}"
+        else:
+            label = f"{produk['emoji']} {produk['nama']} — Rp {fmt(produk['harga'])}"
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"pilih_{key}")])
+
+    # Tombol bawah
+    bawah = []
+    if selected:
+        bawah.append(InlineKeyboardButton("🗑 Reset", callback_data="reset_pilihan"))
+    if any(v > 0 for v in selected.values()):
+        bawah.append(InlineKeyboardButton("➡️ Lanjut", callback_data="lanjut_bayar"))
+    if bawah:
+        keyboard.append(bawah)
+    keyboard.append([InlineKeyboardButton("❌ Batal", callback_data="batal")])
+    return InlineKeyboardMarkup(keyboard)
+
+def build_jumlah_keyboard(key: str):
+    """Keyboard pilih jumlah 1-10"""
+    produk = MENU[key]
+    keyboard = []
+    row = []
+    for i in range(1, 11):
+        row.append(InlineKeyboardButton(str(i), callback_data=f"jumlah_{key}_{i}"))
+        if len(row) == 5:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("❌ Batal", callback_data="batal")])
+    return InlineKeyboardMarkup(keyboard), produk
+
+def ringkasan_items(selected: dict) -> str:
+    teks = ""
+    total_semua = 0
+    for key, jumlah in selected.items():
+        if jumlah > 0:
+            produk = MENU[key]
+            subtotal = produk["harga"] * jumlah
+            total_semua += subtotal
+            teks += f"  {produk['emoji']} {produk['nama']} x{jumlah} = Rp {fmt(subtotal)}\n"
+    teks += f"\n💰 *Total: Rp {fmt(total_semua)}*"
+    return teks, total_semua
 
 # ==================== HANDLERS ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -133,43 +182,64 @@ async def catat_penjualan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.clear()
-    keyboard = [
-        [InlineKeyboardButton("Paket Teman Dekat 🍩❤️\nRp 40.000", callback_data="paket_teman_dekat")],
-        [InlineKeyboardButton("Paket Teman Manis 🍩🌸\nRp 20.000", callback_data="paket_teman_manis")],
-        [InlineKeyboardButton("Donat PCS 🍩\nRp 7.000", callback_data="donat_pcs")],
-        [InlineKeyboardButton("❌ Batal", callback_data="batal")],
-    ]
+    context.user_data["selected"] = {}
     await query.edit_message_text(
-        "🍩 *Pilih Produk:*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        "🍩 *Pilih Produk:*\n\nTap produk untuk memilih, tap lagi untuk ubah jumlah.",
+        reply_markup=build_menu_keyboard({}),
         parse_mode="Markdown"
     )
-    return PILIH_MENU
+    return PILIH_PRODUK
 
-async def pilih_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def pilih_produk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    key = query.data
+    key = query.data.replace("pilih_", "")
+    context.user_data["pilih_key"] = key
     produk = MENU[key]
-    context.user_data["produk"] = produk["nama"]
-    context.user_data["harga_satuan"] = produk["harga"]
+    keyboard, _ = build_jumlah_keyboard(key)
     await query.edit_message_text(
-        f"✅ Produk: *{produk['nama']}*\n💰 Harga: Rp {fmt(produk['harga'])}\n\nMasukkan *jumlah* yang terjual (ketik angka):",
+        f"🍩 *{produk['nama']}*\nRp {fmt(produk['harga'])} / pcs\n\nPilih jumlah:",
+        reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    return PILIH_JUMLAH
+    return PILIH_PRODUK
 
-async def pilih_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        jumlah = int(update.message.text.strip())
-        if jumlah <= 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("❌ Masukkan angka yang benar:")
-        return PILIH_JUMLAH
+async def pilih_jumlah_produk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _, key, jumlah_str = query.data.split("_", 2)
+    # handle key yang mengandung underscore (paket_teman_dekat dll)
+    parts = query.data.split("_")
+    jumlah = int(parts[-1])
+    key = "_".join(parts[1:-1])
 
-    context.user_data["jumlah"] = jumlah
-    context.user_data["total"] = jumlah * context.user_data["harga_satuan"]
+    selected = context.user_data.get("selected", {})
+    selected[key] = jumlah
+    context.user_data["selected"] = selected
+
+    await query.edit_message_text(
+        "🍩 *Pilih Produk:*\n\nTap produk untuk memilih, tap lagi untuk ubah jumlah.",
+        reply_markup=build_menu_keyboard(selected),
+        parse_mode="Markdown"
+    )
+    return PILIH_PRODUK
+
+async def reset_pilihan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data["selected"] = {}
+    await query.edit_message_text(
+        "🍩 *Pilih Produk:*\n\nTap produk untuk memilih, tap lagi untuk ubah jumlah.",
+        reply_markup=build_menu_keyboard({}),
+        parse_mode="Markdown"
+    )
+    return PILIH_PRODUK
+
+async def lanjut_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    selected = context.user_data.get("selected", {})
+    teks_ring, _ = ringkasan_items(selected)
     keyboard = [
         [
             InlineKeyboardButton("QRIS 📱", callback_data="qris"),
@@ -177,8 +247,8 @@ async def pilih_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [InlineKeyboardButton("❌ Batal", callback_data="batal")],
     ]
-    await update.message.reply_text(
-        f"✅ Jumlah: *{jumlah} pcs*\n💰 Total: *Rp {fmt(context.user_data['total'])}*\n\nPilih *metode pembayaran:*",
+    await query.edit_message_text(
+        f"🛒 *Pesanan:*\n{teks_ring}\n\nPilih *metode pembayaran:*",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -187,20 +257,16 @@ async def pilih_jumlah(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def pilih_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    context.user_data["pembayaran"] = PEMBAYARAN[query.data]
-    d = context.user_data
+    pembayaran = PEMBAYARAN[query.data]
+    context.user_data["pembayaran"] = pembayaran
+    selected = context.user_data.get("selected", {})
+    teks_ring, total = ringkasan_items(selected)
     keyboard = [
         [InlineKeyboardButton("✅ Simpan", callback_data="simpan")],
         [InlineKeyboardButton("❌ Batal", callback_data="batal")],
     ]
     await query.edit_message_text(
-        f"📋 *Ringkasan Penjualan:*\n\n"
-        f"🍩 Produk: {d['produk']}\n"
-        f"🔢 Jumlah: {d['jumlah']} pcs\n"
-        f"💰 Harga Satuan: Rp {fmt(d['harga_satuan'])}\n"
-        f"💵 Total: Rp {fmt(d['total'])}\n"
-        f"💳 Pembayaran: {d['pembayaran']}\n\n"
-        f"Konfirmasi data di atas?",
+        f"📋 *Konfirmasi Penjualan:*\n\n{teks_ring}\n💳 Pembayaran: {pembayaran}\n\nSudah benar?",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -210,9 +276,23 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user = query.from_user
-    context.user_data["username"] = f"@{user.username}" if user.username else user.first_name
+    username = f"@{user.username}" if user.username else user.first_name
+    selected = context.user_data.get("selected", {})
+    pembayaran = context.user_data.get("pembayaran", "-")
+
+    items = []
+    for key, jumlah in selected.items():
+        if jumlah > 0:
+            produk = MENU[key]
+            items.append({
+                "nama": produk["nama"],
+                "jumlah": jumlah,
+                "harga_satuan": produk["harga"],
+                "total": produk["harga"] * jumlah,
+            })
+
     try:
-        simpan_ke_sheet(context.user_data)
+        simpan_ke_sheet(items, pembayaran, username)
         keyboard = [
             [InlineKeyboardButton("🛒 Catat Lagi", callback_data="catat")],
             [InlineKeyboardButton("📊 Rekap Hari Ini", callback_data="rekap")],
@@ -280,10 +360,18 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
         states={
-            PILIH_MENU: [CallbackQueryHandler(pilih_menu, pattern="^(paket_teman_dekat|paket_teman_manis|donat_pcs)$")],
-            PILIH_JUMLAH: [MessageHandler(filters.TEXT & ~filters.COMMAND, pilih_jumlah)],
-            PILIH_BAYAR: [CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$")],
-            KONFIRMASI: [CallbackQueryHandler(simpan_data, pattern="^simpan$")],
+            PILIH_PRODUK: [
+                CallbackQueryHandler(pilih_produk, pattern="^pilih_"),
+                CallbackQueryHandler(pilih_jumlah_produk, pattern="^jumlah_"),
+                CallbackQueryHandler(reset_pilihan, pattern="^reset_pilihan$"),
+                CallbackQueryHandler(lanjut_bayar, pattern="^lanjut_bayar$"),
+            ],
+            PILIH_BAYAR: [
+                CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$"),
+            ],
+            KONFIRMASI: [
+                CallbackQueryHandler(simpan_data, pattern="^simpan$"),
+            ],
         },
         fallbacks=[
             CallbackQueryHandler(batal, pattern="^batal$"),
