@@ -16,6 +16,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SHEET_NAME = "Penjualan"
 WIB = pytz.timezone("Asia/Jakarta")
 
+# Daftar Menu Lengkap
 MENU = {
     "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000, "emoji": "🍩❤️"},
     "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
@@ -117,31 +118,43 @@ def hapus_transaksi_terakhir():
 def fmt(angka):
     return f"{int(angka):,}".replace(",", ".")
 
-# ==================== KEYBOARD ====================
+# ==================== KEYBOARD GRID VERSION ====================
 def build_menu_keyboard(selected: dict):
     keyboard = []
     total_semua = 0
-    for key, produk in MENU.items():
-        jumlah = selected.get(key, 0)
-        total_semua += produk["harga"] * jumlah
-        keyboard.append([InlineKeyboardButton(
-            f"{produk['emoji']} {produk['nama']} (Rp {fmt(produk['harga'])})",
-            callback_data="noop"
-        )])
-        if jumlah == 0:
-            keyboard.append([InlineKeyboardButton("➕ Tambah", callback_data=f"plus_{key}")])
-        else:
-            keyboard.append([
-                InlineKeyboardButton("➖", callback_data=f"minus_{key}"),
-                InlineKeyboardButton(f"  {jumlah}  ", callback_data="noop"),
-                InlineKeyboardButton("➕", callback_data=f"plus_{key}"),
-            ])
+    menu_list = list(MENU.items())
 
+    # Membuat baris produk (2 produk per baris)
+    for i in range(0, len(menu_list), 2):
+        row_items = menu_list[i:i+2]
+        buttons = []
+        for key, produk in row_items:
+            jumlah = selected.get(key, 0)
+            total_semua += produk["harga"] * jumlah
+            
+            # Jika dipilih, tampilkan tanda ✅ dan jumlahnya
+            label = f"{produk['emoji']} {produk['nama']}"
+            if jumlah > 0:
+                label = f"✅ {jumlah}x {produk['nama']}"
+            
+            buttons.append(InlineKeyboardButton(label, callback_data=f"plus_{key}"))
+        keyboard.append(buttons)
+
+        # Tambahkan baris tombol minus hanya untuk produk di baris ini yang sudah dipilih
+        minus_buttons = []
+        for key, produk in row_items:
+            if selected.get(key, 0) > 0:
+                minus_buttons.append(InlineKeyboardButton(f"➖ {produk['nama']}", callback_data=f"minus_{key}"))
+        if minus_buttons:
+            keyboard.append(minus_buttons)
+
+    # Tombol Aksi di bagian paling bawah
     if total_semua > 0:
-        keyboard.append([InlineKeyboardButton("🗑 Reset", callback_data="reset_pilihan")])
-        keyboard.append([InlineKeyboardButton(f"➡️ Bayar — Rp {fmt(total_semua)}", callback_data="lanjut_bayar")])
+        keyboard.append([InlineKeyboardButton(f"➡️ BAYAR: Rp {fmt(total_semua)}", callback_data="lanjut_bayar")])
+        keyboard.append([InlineKeyboardButton("🗑 Reset Pilihan", callback_data="reset_pilihan")])
     else:
         keyboard.append([InlineKeyboardButton("❌ Batal", callback_data="batal")])
+        
     return InlineKeyboardMarkup(keyboard)
 
 def ringkasan_items(selected: dict):
@@ -183,11 +196,11 @@ async def menu_utama_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def lihat_riwayat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("Mengambil data...")
+    await query.answer()
     riwayat = ambil_riwayat_terakhir()
     keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
     await query.edit_message_text(
-        f"📜 *5 Transaksi Terakhir:*\n\n{riwayat}\n\n_Gunakan ini untuk cek apakah jualanmu sudah tercatat._",
+        f"📜 *Riwayat Terakhir:*\n\n{riwayat}\n\n_Cek ini untuk memastikan data sudah masuk._",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -197,7 +210,7 @@ async def catat_penjualan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     context.user_data["selected"] = {}
     await query.edit_message_text(
-        "🍩 *Pilih Produk:*\n\nTap ➕ untuk tambah, ➖ untuk kurangi.",
+        "🍩 *Pilih Produk:*\n\nKlik nama untuk tambah, ➖ untuk kurangi.",
         reply_markup=build_menu_keyboard({}),
         parse_mode="Markdown"
     )
@@ -211,7 +224,7 @@ async def plus_produk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected[key] = selected.get(key, 0) + 1
     context.user_data["selected"] = selected
     await query.edit_message_text(
-        "🍩 *Pilih Produk:*\n\nTap ➕ untuk tambah, ➖ untuk kurangi.",
+        "🍩 *Pilih Produk:*\n\nKlik nama untuk tambah, ➖ untuk kurangi.",
         reply_markup=build_menu_keyboard(selected),
         parse_mode="Markdown"
     )
@@ -225,7 +238,7 @@ async def minus_produk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected[key] = max(0, selected.get(key, 0) - 1)
     context.user_data["selected"] = selected
     await query.edit_message_text(
-        "🍩 *Pilih Produk:*\n\nTap ➕ untuk tambah, ➖ untuk kurangi.",
+        "🍩 *Pilih Produk:*\n\nKlik nama untuk tambah, ➖ untuk kurangi.",
         reply_markup=build_menu_keyboard(selected),
         parse_mode="Markdown"
     )
@@ -236,7 +249,7 @@ async def reset_pilihan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     context.user_data["selected"] = {}
     await query.edit_message_text(
-        "🍩 *Pilih Produk:*\n\nTap ➕ untuk tambah, ➖ untuk kurangi.",
+        "🍩 *Pilih Produk:*",
         reply_markup=build_menu_keyboard({}),
         parse_mode="Markdown"
     )
@@ -248,14 +261,11 @@ async def lanjut_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected = context.user_data.get("selected", {})
     teks, total, _ = ringkasan_items(selected)
     keyboard = [
-        [
-            InlineKeyboardButton("QRIS 📱", callback_data="qris"),
-            InlineKeyboardButton("Cash 💵", callback_data="cash"),
-        ],
+        [InlineKeyboardButton("QRIS 📱", callback_data="qris"), InlineKeyboardButton("Cash 💵", callback_data="cash")],
         [InlineKeyboardButton("⬅️ Ubah Pesanan", callback_data="catat")],
     ]
     await query.edit_message_text(
-        f"🛒 *Pesanan:*\n{teks}\nPilih *metode pembayaran:*",
+        f"🛒 *Ringkasan Pesanan:*\n{teks}\n*Total: Rp {fmt(total)}*\n\nPilih pembayaran:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -268,11 +278,11 @@ async def pilih_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected = context.user_data.get("selected", {})
     teks, total, _ = ringkasan_items(selected)
     keyboard = [
-        [InlineKeyboardButton("✅ Simpan", callback_data="simpan")],
-        [InlineKeyboardButton("⬅️ Ubah Pesanan", callback_data="catat")],
+        [InlineKeyboardButton("✅ SIMPAN DATA", callback_data="simpan")],
+        [InlineKeyboardButton("⬅️ Kembali", callback_data="catat")],
     ]
     await query.edit_message_text(
-        f"📋 *Konfirmasi:*\n\n{teks}\n💳 {context.user_data['pembayaran']}\n\nSudah benar?",
+        f"📋 *Konfirmasi Akhir:*\n\n{teks}\n💳 {context.user_data['pembayaran']}\n\nSudah sesuai?",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -285,73 +295,43 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pembayaran = context.user_data.get("pembayaran", "-")
     _, _, items = ringkasan_items(selected)
     try:
-        waktu_simpan = simpan_ke_sheet(items, pembayaran)
-        keyboard = [
-            [InlineKeyboardButton("🛒 Catat Lagi", callback_data="catat")],
-            [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")],
-        ]
+        waktu = simpan_ke_sheet(items, pembayaran)
+        keyboard = [[InlineKeyboardButton("🛒 Catat Lagi", callback_data="catat")], [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
         await query.edit_message_text(
-            f"✅ *Berhasil dicatat!* 📊\nWaktu: `{waktu_simpan}`\n\n_Sekarang aman untuk melayani pembeli berikutnya._",
+            f"✅ *Berhasil Disimpan!*\n⏰ Jam: `{waktu}`\n\n_Data sudah masuk ke Google Sheets._",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     except Exception as e:
-        logger.error(f"Error simpan: {e}")
-        keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
-        await query.edit_message_text(
-            f"❌ Gagal menyimpan: {str(e)}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        logger.error(f"Error: {e}")
+        await query.edit_message_text(f"❌ Gagal simpan: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="menu_utama")]]))
+    
     context.user_data.clear()
     return ConversationHandler.END
 
 async def hapus_terakhir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Ya, Hapus", callback_data="konfirm_hapus"),
-            InlineKeyboardButton("❌ Batal", callback_data="menu_utama"),
-        ]
-    ]
-    await query.edit_message_text(
-        "⚠️ Yakin mau hapus transaksi terakhir?",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    keyboard = [[InlineKeyboardButton("✅ Ya, Hapus", callback_data="konfirm_hapus")], [InlineKeyboardButton("❌ Batal", callback_data="menu_utama")]]
+    await query.edit_message_text("⚠️ Hapus transaksi terakhir yang baru saja masuk?", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def konfirm_hapus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    try:
-        ok, hasil = hapus_transaksi_terakhir()
-        keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
-        if ok:
-            await query.edit_message_text(
-                f"✅ Transaksi terakhir berhasil dihapus ({hasil} baris).",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        else:
-            await query.edit_message_text(f"❌ {hasil}", reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception as e:
-        logger.error(f"Error hapus: {e}")
-        keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
-        await query.edit_message_text(f"❌ Gagal menghapus: {str(e)}", reply_markup=InlineKeyboardMarkup(keyboard))
+    ok, hasil = hapus_transaksi_terakhir()
+    msg = f"✅ Berhasil dihapus ({hasil} baris)." if ok else f"❌ {hasil}"
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="menu_utama")]]))
 
 async def batal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.clear()
-    keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
-    await query.edit_message_text("❌ Dibatalkan.", reply_markup=InlineKeyboardMarkup(keyboard))
+    await start(update, context)
     return ConversationHandler.END
-
-async def noop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.answer()
 
 # ==================== MAIN ====================
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
         states={
@@ -360,7 +340,6 @@ def main():
                 CallbackQueryHandler(minus_produk, pattern="^minus_"),
                 CallbackQueryHandler(reset_pilihan, pattern="^reset_pilihan$"),
                 CallbackQueryHandler(lanjut_bayar, pattern="^lanjut_bayar$"),
-                CallbackQueryHandler(noop, pattern="^noop$"),
             ],
             PILIH_BAYAR: [
                 CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$"),
@@ -371,23 +350,18 @@ def main():
                 CallbackQueryHandler(catat_penjualan, pattern="^catat$"),
             ],
         },
-        fallbacks=[
-            CallbackQueryHandler(batal, pattern="^batal$"),
-            CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$"),
-            CommandHandler("start", start),
-        ],
+        fallbacks=[CallbackQueryHandler(batal, pattern="^batal$"), CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$")],
         per_message=False,
     )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$"))
     app.add_handler(CallbackQueryHandler(lihat_riwayat, pattern="^riwayat$"))
     app.add_handler(CallbackQueryHandler(hapus_terakhir, pattern="^hapus_terakhir$"))
     app.add_handler(CallbackQueryHandler(konfirm_hapus, pattern="^konfirm_hapus$"))
-    app.add_handler(CallbackQueryHandler(noop, pattern="^noop$"))
+    app.add_handler(CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$"))
 
-    logger.info("🍩 Bot Donat berjalan...")
+    logger.info("🍩 Bot Donat Berjalan...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
