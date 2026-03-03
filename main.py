@@ -20,6 +20,7 @@ MENU = {
     "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000, "emoji": "🍩❤️"},
     "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
     "donat_pcs":         {"nama": "Donat PCS",          "harga": 7000,  "emoji": "🍩"},
+    "crackbite":         {"nama": "Crackbite",          "harga": 10000, "emoji": "🍪✨"}, # Produk Baru
 }
 
 PEMBAYARAN = {
