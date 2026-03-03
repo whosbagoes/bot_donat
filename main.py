@@ -20,7 +20,7 @@ MENU = {
     "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000, "emoji": "🍩❤️"},
     "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
     "donat_pcs":         {"nama": "Donat PCS",          "harga": 7000,  "emoji": "🍩"},
-    "crackbite":         {"nama": "Crackbite",          "harga": 10000, "emoji": "🍪✨"}, # Produk Baru
+    "crackbite":         {"nama": "Crackbite",          "harga": 10000, "emoji": "🍪✨"},
 }
 
 PEMBAYARAN = {
@@ -51,18 +51,10 @@ def get_sheet():
         sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar"])
     return sheet
 
-def parse_angka(nilai):
-    if not nilai:
-        return 0
-    nilai = str(nilai).replace("Rp", "").replace(",", "").replace(".", "").strip()
-    try:
-        return int(float(nilai))
-    except:
-        return 0
-
 def simpan_ke_sheet(items: list, pembayaran: str):
     sheet = get_sheet()
-    no = len(sheet.get_all_values())
+    rows = sheet.get_all_values()
+    no = len(rows)
     now = datetime.now(WIB)
     for item in items:
         sheet.append_row([
@@ -76,6 +68,33 @@ def simpan_ke_sheet(items: list, pembayaran: str):
             pembayaran,
         ])
         no += 1
+    return now.strftime("%H:%M:%S")
+
+def ambil_riwayat_terakhir(limit=5):
+    try:
+        sheet = get_sheet()
+        rows = sheet.get_all_values()
+        if len(rows) <= 1:
+            return "Belum ada transaksi."
+        
+        # Ambil baris terakhir (maksimal 10 baris untuk mencari 5 transaksi unik)
+        recent_rows = rows[1:][-15:] 
+        riwayat = []
+        last_time = ""
+        count = 0
+        
+        for row in reversed(recent_rows):
+            time_str = row[2]
+            if time_str != last_time:
+                riwayat.append(f"⏰ `{time_str}` - {row[3]} ({row[7]})")
+                last_time = time_str
+                count += 1
+            if count >= limit:
+                break
+                
+        return "\n".join(riwayat)
+    except Exception as e:
+        return f"Gagal ambil riwayat: {str(e)}"
 
 def hapus_transaksi_terakhir():
     sheet = get_sheet()
@@ -144,24 +163,28 @@ def ringkasan_items(selected: dict):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🛒 Catat Penjualan", callback_data="catat")],
-        [InlineKeyboardButton("🗑 Hapus Transaksi Terakhir", callback_data="hapus_terakhir")],
+        [InlineKeyboardButton("📜 5 Transaksi Terakhir", callback_data="riwayat")],
+        [InlineKeyboardButton("🗑 Hapus Terakhir", callback_data="hapus_terakhir")],
     ]
-    await update.message.reply_text(
-        "🍩 *Bot Penjualan Donat*\n\nHalo! Mau ngapain?",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    text = "🍩 *Bot Penjualan Donat*\n\nHalo! Mau ngapain?"
+    if update.message:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    else:
+        await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def menu_utama_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.clear()
-    keyboard = [
-        [InlineKeyboardButton("🛒 Catat Penjualan", callback_data="catat")],
-        [InlineKeyboardButton("🗑 Hapus Transaksi Terakhir", callback_data="hapus_terakhir")],
-    ]
+    await start(update, context)
+
+async def lihat_riwayat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer("Mengambil data...")
+    riwayat = ambil_riwayat_terakhir()
+    keyboard = [[InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")]]
     await query.edit_message_text(
-        "🍩 *Bot Penjualan Donat*\n\nMau ngapain?",
+        f"📜 *5 Transaksi Terakhir:*\n\n{riwayat}\n\n_Gunakan ini untuk cek apakah jualanmu sudah tercatat._",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -259,13 +282,13 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pembayaran = context.user_data.get("pembayaran", "-")
     _, _, items = ringkasan_items(selected)
     try:
-        simpan_ke_sheet(items, pembayaran)
+        waktu_simpan = simpan_ke_sheet(items, pembayaran)
         keyboard = [
             [InlineKeyboardButton("🛒 Catat Lagi", callback_data="catat")],
             [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_utama")],
         ]
         await query.edit_message_text(
-            "✅ *Penjualan berhasil dicatat!* 📊",
+            f"✅ *Berhasil dicatat!* 📊\nWaktu: `{waktu_simpan}`\n\n_Sekarang aman untuk melayani pembeli berikutnya._",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -356,6 +379,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$"))
+    app.add_handler(CallbackQueryHandler(lihat_riwayat, pattern="^riwayat$"))
     app.add_handler(CallbackQueryHandler(hapus_terakhir, pattern="^hapus_terakhir$"))
     app.add_handler(CallbackQueryHandler(konfirm_hapus, pattern="^konfirm_hapus$"))
     app.add_handler(CallbackQueryHandler(noop, pattern="^noop$"))
