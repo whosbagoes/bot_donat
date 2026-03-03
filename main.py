@@ -21,6 +21,10 @@ MENU = {
     "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
     "donat_pcs":         {"nama": "Donat PCS",          "harga": 7000,  "emoji": "🍩"},
     "crackbite":         {"nama": "Crackbite",          "harga": 10000, "emoji": "🍪✨"},
+    "cheesedream":       {"nama": "Cheesedream",        "harga": 15000, "emoji": "🧀☁️"},
+    "peanut_butter":     {"nama": "Peanut Butter",      "harga": 10000, "emoji": "🥜🤎"},
+    "ichigo_c":          {"nama": "Ichigo C",           "harga": 14000, "emoji": "🍓🍫"},
+    "choco_c":           {"nama": "Choco C",            "harga": 14000, "emoji": "🍫🍩"},
 }
 
 PEMBAYARAN = {
@@ -77,7 +81,6 @@ def ambil_riwayat_terakhir(limit=5):
         if len(rows) <= 1:
             return "Belum ada transaksi."
         
-        # Ambil baris terakhir (maksimal 10 baris untuk mencari 5 transaksi unik)
         recent_rows = rows[1:][-15:] 
         riwayat = []
         last_time = ""
