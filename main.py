@@ -35,7 +35,7 @@ PEMBAYARAN = {
     "cash": "Cash 💵",
 }
 
-PILIH_PRODUK, PILIH_BAYAR, KONFIRMASI = range(3)
+PILIH_PRODUK, PILIH_BAYAR, INPUT_DISKON, KONFIRMASI = range(4)
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,16 +52,17 @@ def get_sheet():
         sheet = spreadsheet.worksheet(SHEET_NAME)
     except gspread.WorksheetNotFound:
         sheet = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=8)
-        sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar"])
+        sheet.append_row(["No", "Tanggal", "Waktu", "Produk", "Jumlah", "Harga Satuan", "Total", "Metode Bayar", "Diskon"])
     return sheet
 
-def simpan_ke_sheet(items: list, pembayaran: str):
+def simpan_ke_sheet(items: list, pembayaran: str, diskon: int = 0):
     sheet = get_sheet()
     rows = sheet.get_all_values()
     no = len(rows)
     now = datetime.now(WIB)
-    for item in items:
-        sheet.append_row([no, now.strftime("%d/%m/%Y"), now.strftime("%H:%M:%S"), item["nama"], item["jumlah"], item["harga_satuan"], item["total"], pembayaran])
+    for i, item in enumerate(items):
+        diskon_row = diskon if i == 0 else 0  # tulis diskon hanya di baris pertama
+        sheet.append_row([no, now.strftime("%d/%m/%Y"), now.strftime("%H:%M:%S"), item["nama"], item["jumlah"], item["harga_satuan"], item["total"], pembayaran, diskon_row])
         no += 1
     return now.strftime("%H:%M:%S")
 
@@ -174,9 +175,44 @@ async def lanjut_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     teks, total, _ = ringkasan_items(context.user_data.get("selected", {}))
-    keyboard = [[InlineKeyboardButton("QRIS 📱", callback_data="qris"), InlineKeyboardButton("Cash 💵", callback_data="cash")], [InlineKeyboardButton("⬅️ Edit Pesanan", callback_data="catat")]]
-    await query.edit_message_text(f"🛒 *Ringkasan:*\n{teks}\n*Total: Rp {fmt(total)}*\n\nPilih cara bayar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    diskon = context.user_data.get("diskon", 0)
+    total_bayar = max(0, total - diskon)
+    diskon_info = f"\n🏷️ Diskon: -Rp {fmt(diskon)}\n*Total Bayar: Rp {fmt(total_bayar)}*" if diskon > 0 else f"\n*Total: Rp {fmt(total)}*"
+    keyboard = [
+        [InlineKeyboardButton("🏷️ Tambah/Edit Diskon", callback_data="input_diskon")],
+        [InlineKeyboardButton("QRIS 📱", callback_data="qris"), InlineKeyboardButton("Cash 💵", callback_data="cash")],
+        [InlineKeyboardButton("⬅️ Edit Pesanan", callback_data="catat")]
+    ]
+    await query.edit_message_text(f"🛒 *Ringkasan:*\n{teks}{diskon_info}\n\nPilih cara bayar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     return PILIH_BAYAR
+
+async def minta_input_diskon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🏷️ *Masukkan nominal diskon (angka saja):*\nContoh: `5000`", parse_mode="Markdown")
+    return INPUT_DISKON
+
+async def terima_diskon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    teks = update.message.text.strip().replace(".", "").replace(",", "")
+    try:
+        diskon = int(teks)
+        if diskon < 0:
+            raise ValueError
+        context.user_data["diskon"] = diskon
+        # Kirim pesan sementara lalu tampilkan ulang ringkasan
+        teks_ringkasan, total, _ = ringkasan_items(context.user_data.get("selected", {}))
+        total_bayar = max(0, total - diskon)
+        diskon_info = f"\n🏷️ Diskon: -Rp {fmt(diskon)}\n*Total Bayar: Rp {fmt(total_bayar)}*"
+        keyboard = [
+            [InlineKeyboardButton("🏷️ Tambah/Edit Diskon", callback_data="input_diskon")],
+            [InlineKeyboardButton("QRIS 📱", callback_data="qris"), InlineKeyboardButton("Cash 💵", callback_data="cash")],
+            [InlineKeyboardButton("⬅️ Edit Pesanan", callback_data="catat")]
+        ]
+        await update.message.reply_text(f"🛒 *Ringkasan:*\n{teks_ringkasan}{diskon_info}\n\nPilih cara bayar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        return PILIH_BAYAR
+    except ValueError:
+        await update.message.reply_text("❌ Input tidak valid. Masukkan angka saja, contoh: `5000`", parse_mode="Markdown")
+        return INPUT_DISKON
 
 async def pilih_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -184,7 +220,11 @@ async def pilih_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["pembayaran"] = PEMBAYARAN[query.data]
     teks, _, _ = ringkasan_items(context.user_data.get("selected", {}))
     keyboard = [[InlineKeyboardButton("✅ SIMPAN & SELESAI", callback_data="simpan")], [InlineKeyboardButton("⬅️ Ganti Pesanan", callback_data="catat")]]
-    await query.edit_message_text(f"📋 *Konfirmasi:*\n\n{teks}\n💳 Bayar: {context.user_data['pembayaran']}\n\nSimpan sekarang?", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    diskon = context.user_data.get("diskon", 0)
+    _, total, _ = ringkasan_items(context.user_data.get("selected", {}))
+    total_bayar = max(0, total - diskon)
+    diskon_info = f"🏷️ Diskon: -Rp {fmt(diskon)}\n" if diskon > 0 else ""
+    await query.edit_message_text(f"📋 *Konfirmasi:*\n\n{teks}\n{diskon_info}💳 Bayar: {context.user_data['pembayaran']}\n*Total Bayar: Rp {fmt(total_bayar)}*\n\nSimpan sekarang?", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     return KONFIRMASI
 
 async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -192,7 +232,8 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     _, _, items = ringkasan_items(context.user_data.get("selected", {}))
     try:
-        waktu = simpan_ke_sheet(items, context.user_data.get("pembayaran", "-"))
+        diskon = context.user_data.get("diskon", 0)
+        waktu = simpan_ke_sheet(items, context.user_data.get("pembayaran", "-"), diskon)
         await query.edit_message_text(f"✅ *Sukses Dicatat!*\n⏰ Jam: `{waktu}`", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Transaksi Baru", callback_data="catat")], [InlineKeyboardButton("🏠 Home", callback_data="menu_utama")]]), parse_mode="Markdown")
     except Exception as e:
         await query.edit_message_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Home", callback_data="menu_utama")]]))
@@ -206,7 +247,7 @@ def ringkasan_items(selected: dict):
             p = MENU[key]
             sub = p["harga"] * jumlah
             total += sub
-            teks += f"• {p['emoji']} {p['nama']} x{jumlah} = {fmt(sub)}\n"
+            teks += f"• {p['nama']} x{jumlah} = Rp {fmt(sub)}\n"
             items.append({"nama": p["nama"], "jumlah": jumlah, "harga_satuan": p["harga"], "total": sub})
     return teks, total, items
 
@@ -247,7 +288,8 @@ def main():
         entry_points=[CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
         states={
             PILIH_PRODUK: [CallbackQueryHandler(plus_produk, pattern="^plus_"), CallbackQueryHandler(minus_produk, pattern="^minus_"), CallbackQueryHandler(lanjut_bayar, pattern="^lanjut_bayar$"), CallbackQueryHandler(catat_penjualan, pattern="^reset_pilihan$")],
-            PILIH_BAYAR: [CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$"), CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
+            PILIH_BAYAR: [CallbackQueryHandler(minta_input_diskon, pattern="^input_diskon$"), CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$"), CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
+            INPUT_DISKON: [MessageHandler(filters.TEXT & ~filters.COMMAND, terima_diskon)],
             KONFIRMASI: [CallbackQueryHandler(simpan_data, pattern="^simpan$"), CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
         },
         fallbacks=[CallbackQueryHandler(batal, pattern="^batal$"), CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$")],
