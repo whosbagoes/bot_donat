@@ -26,6 +26,8 @@ MENU = {
     "peanut_butter":     {"nama": "Peanut Butter",      "harga": 10000, "emoji": "🥜🤎"},
     "ichigo_c":          {"nama": "Ichigo C",           "harga": 14000, "emoji": "🍓🍫"},
     "choco_c":           {"nama": "Choco C",            "harga": 14000, "emoji": "🍫🍩"},
+    "garlic_butter":     {"nama": "Garlic Butter",      "harga": 14000, "emoji": "🧄🧈"},  # ✅ BARU
+    "beef_pizza":        {"nama": "Beef Pizza",         "harga": 14000, "emoji": "🍕🥩"},  # ✅ BARU
 }
 
 PEMBAYARAN = {
@@ -116,7 +118,6 @@ def build_menu_keyboard(selected: dict):
         minus_buttons = []
         for key, produk in row_items:
             if selected.get(key, 0) > 0:
-                # Menggunakan ❌ agar kontras warna merah terlihat jelas
                 minus_buttons.append(InlineKeyboardButton(f"❌ Kurangi {produk['nama']}", callback_data=f"minus_{key}"))
         if minus_buttons:
             keyboard.append(minus_buttons)
@@ -198,7 +199,6 @@ async def simpan_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- (Fungsi bantu lainnya tetap sama seperti sebelumnya) ---
 def ringkasan_items(selected: dict):
     teks, total, items = "", 0, []
     for key, jumlah in selected.items():
