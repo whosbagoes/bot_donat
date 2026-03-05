@@ -18,16 +18,16 @@ WIB = pytz.timezone("Asia/Jakarta")
 
 # Daftar Menu Lengkap
 MENU = {
-    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000, "emoji": "🍩❤️"},
-    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000, "emoji": "🍩🌸"},
-    "donat_pcs":         {"nama": "Donat PCS",          "harga": 7000,  "emoji": "🍩"},
-    "crackbite":         {"nama": "Crackbite",          "harga": 10000, "emoji": "🍪✨"},
-    "cheesedream":       {"nama": "Cheesedream",        "harga": 15000, "emoji": "🧀☁️"},
-    "peanut_butter":     {"nama": "Peanut Butter",      "harga": 10000, "emoji": "🥜🤎"},
-    "ichigo_c":          {"nama": "Ichigo C",           "harga": 14000, "emoji": "🍓🍫"},
-    "choco_c":           {"nama": "Choco C",            "harga": 14000, "emoji": "🍫🍩"},
-    "garlic_butter":     {"nama": "Garlic Butter",      "harga": 14000, "emoji": "🧄🧈"},  # ✅ BARU
-    "beef_pizza":        {"nama": "Beef Pizza",         "harga": 14000, "emoji": "🍕🥩"},  # ✅ BARU
+    "paket_teman_dekat": {"nama": "Paket Teman Dekat", "harga": 40000},
+    "paket_teman_manis": {"nama": "Paket Teman Manis", "harga": 20000},
+    "donat_pcs":         {"nama": "Donat PCS",          "harga": 7000 },
+    "crackbite":         {"nama": "Crackbite",          "harga": 10000},
+    "cheesedream":       {"nama": "Cheesedream",        "harga": 15000},
+    "peanut_butter":     {"nama": "Peanut Butter",      "harga": 10000},
+    "ichigo_c":          {"nama": "Ichigo C",           "harga": 14000},
+    "choco_c":           {"nama": "Choco C",            "harga": 14000},
+    "garlic_butter":     {"nama": "Garlic Butter",      "harga": 14000},
+    "beef_pizza":        {"nama": "Beef Pizza",         "harga": 14000},
 }
 
 PEMBAYARAN = {
@@ -109,7 +109,7 @@ def build_menu_keyboard(selected: dict):
         for key, produk in row_items:
             jumlah = selected.get(key, 0)
             total_semua += produk["harga"] * jumlah
-            label = f"{produk['emoji']} {produk['nama']}"
+            label = produk["nama"]
             if jumlah > 0: label = f"✅ {jumlah}x {produk['nama']}"
             buttons.append(InlineKeyboardButton(label, callback_data=f"plus_{key}"))
         keyboard.append(buttons)
