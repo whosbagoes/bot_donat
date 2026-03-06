@@ -1,4 +1,4 @@
-import logging  
+import logging 
 import os
 import json
 import pytz
@@ -189,8 +189,24 @@ async def lanjut_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def minta_input_diskon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("🏷️ *Masukkan nominal diskon (angka saja):*\nContoh: `5000`", parse_mode="Markdown")
+    keyboard = [[InlineKeyboardButton("⬅️ Kembali", callback_data="batal_diskon")]]
+    await query.edit_message_text("🏷️ *Masukkan nominal diskon (angka saja):*\nContoh: `5000`", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     return INPUT_DISKON
+
+async def batal_diskon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    teks, total, _ = ringkasan_items(context.user_data.get("selected", {}))
+    diskon = context.user_data.get("diskon", 0)
+    total_bayar = max(0, total - diskon)
+    diskon_info = f"\n🏷️ Diskon: -Rp {fmt(diskon)}\n*Total Bayar: Rp {fmt(total_bayar)}*" if diskon > 0 else f"\n*Total: Rp {fmt(total)}*"
+    keyboard = [
+        [InlineKeyboardButton("🏷️ Tambah/Edit Diskon", callback_data="input_diskon")],
+        [InlineKeyboardButton("QRIS 📱", callback_data="qris"), InlineKeyboardButton("Cash 💵", callback_data="cash")],
+        [InlineKeyboardButton("⬅️ Edit Pesanan", callback_data="catat")]
+    ]
+    await query.edit_message_text(f"🛒 *Ringkasan:*\n{teks}{diskon_info}\n\nPilih cara bayar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    return PILIH_BAYAR
 
 async def terima_diskon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     teks = update.message.text.strip().replace(".", "").replace(",", "")
@@ -289,7 +305,7 @@ def main():
         states={
             PILIH_PRODUK: [CallbackQueryHandler(plus_produk, pattern="^plus_"), CallbackQueryHandler(minus_produk, pattern="^minus_"), CallbackQueryHandler(lanjut_bayar, pattern="^lanjut_bayar$"), CallbackQueryHandler(catat_penjualan, pattern="^reset_pilihan$")],
             PILIH_BAYAR: [CallbackQueryHandler(minta_input_diskon, pattern="^input_diskon$"), CallbackQueryHandler(pilih_bayar, pattern="^(qris|cash)$"), CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
-            INPUT_DISKON: [MessageHandler(filters.TEXT & ~filters.COMMAND, terima_diskon)],
+            INPUT_DISKON: [CallbackQueryHandler(batal_diskon, pattern="^batal_diskon$"), MessageHandler(filters.TEXT & ~filters.COMMAND, terima_diskon)],
             KONFIRMASI: [CallbackQueryHandler(simpan_data, pattern="^simpan$"), CallbackQueryHandler(catat_penjualan, pattern="^catat$")],
         },
         fallbacks=[CallbackQueryHandler(batal, pattern="^batal$"), CallbackQueryHandler(menu_utama_cb, pattern="^menu_utama$")],
