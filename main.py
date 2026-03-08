@@ -1,5 +1,5 @@
 import logging 
-import os 
+import os
 import json
 import pytz
 from datetime import datetime
@@ -28,6 +28,8 @@ MENU = {
     "choco_c":           {"nama": "Choco C",            "harga": 14000},
     "garlic_butter":     {"nama": "Garlic Butter",      "harga": 14000},
     "beef_pizza":        {"nama": "Beef Pizza",         "harga": 14000},
+    "beef_mentai":       {"nama": "Beef Mentai",        "harga": 14000},
+    "bombo":             {"nama": "Bombo",               "harga": 10000},
 }
 
 PEMBAYARAN = {
